@@ -2,7 +2,7 @@
 clear
 
 # ==============================================================================
-# ORBIT OF OPS COMMAND CENTER: GSP510 VERIFIED MASTER SCRIPT
+# GSP510 PERFECT MASTER SCRIPT (RECORDING EDITION)
 # ==============================================================================
 GREEN=$(tput setaf 2)
 YELLOW=$(tput setaf 3)
@@ -22,36 +22,14 @@ echo "  \____/|_|  |_.__/|_|\__| \___/ |_|   \___/| .__/|___/ "
 echo "                                            | |         "
 echo "                                            |_|         "
 echo "${RESET}"
-echo "${MAGENTA}${BOLD}>>> INITIATING VERIFIED GSP510 AUTOMATION <<<${RESET}"
+echo "${MAGENTA}${BOLD}>>> INITIATING GSP510 KUBERNETES AUTOMATION <<<${RESET}"
 echo ""
 
 # ==============================================================================
-# PHASE 1: AUTO-FETCH & CONFIRM ZONE
-# ==============================================================================
-export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-DETECTED_ZONE=$(gcloud config get-value compute/zone 2>/dev/null)
-
-if [ -z "$DETECTED_ZONE" ]; then
-    DETECTED_ZONE=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[google-compute-default-zone])" 2>/dev/null)
-fi
-
-echo "${CYAN}[*] Auto-detected Zone: ${YELLOW}${BOLD}${DETECTED_ZONE}${RESET}"
-read -p "Press ENTER to use '${DETECTED_ZONE}' or type a different ZONE: " INPUT_ZONE
-
-if [ -n "$INPUT_ZONE" ]; then
-    export ZONE=$INPUT_ZONE
-else
-    export ZONE=$DETECTED_ZONE
-fi
-
-export REGION="${ZONE%-*}"
-echo "${GREEN}[+] Confirmed Zone: $ZONE | Region: $REGION${RESET}"
-echo ""
-
-# ==============================================================================
-# PHASE 2: INTERACTIVE VARIABLE GATHERING
+# VARIABLE GATHERING (Explicitly input to prevent grading mismatch)
 # ==============================================================================
 echo "${YELLOW}${BOLD}Please enter the exact randomized names from your lab instructions:${RESET}"
+read -p "Enter ZONE (e.g., us-central1-a): " ZONE
 read -p "Enter CLUSTER NAME: " CLUSTER_NAME
 read -p "Enter NAMESPACE: " NAMESPACE
 read -p "Enter INTERVAL (e.g., 10s): " INTERVAL
@@ -59,36 +37,35 @@ read -p "Enter REPO NAME: " REPO_NAME
 read -p "Enter SERVICE NAME: " SERVICE_NAME
 echo ""
 
-echo "${CYAN}${BOLD}[*] Target Locked. Starting Execution...${RESET}"
+export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+export REGION="${ZONE%-*}"
+gcloud config set compute/zone $ZONE --quiet
+
+echo "${CYAN}${BOLD}[*] Target Locked. Executing Tasks...${RESET}"
 
 # ==============================================================================
 # TASK 1: CREATE GKE CLUSTER
 # ==============================================================================
 echo -e "\n${YELLOW}[*] Task 1: Creating GKE Cluster (This takes ~3-5 minutes)...${RESET}"
-gcloud config set compute/zone $ZONE --quiet
-
 gcloud container clusters create $CLUSTER_NAME \
     --zone $ZONE \
     --release-channel regular \
-    --cluster-version latest \
     --num-nodes 3 \
     --min-nodes 2 \
     --max-nodes 6 \
     --enable-autoscaling \
-    --no-enable-ip-alias \
     --quiet
 
 gcloud container clusters get-credentials $CLUSTER_NAME --zone $ZONE --quiet
 
 # ==============================================================================
-# TASK 2: ENABLE MANAGED PROMETHEUS & NAMESPACE
+# TASK 2: ENABLE MANAGED PROMETHEUS
 # ==============================================================================
-echo -e "\n${YELLOW}[*] Task 2: Enabling Managed Prometheus & Setting Up Monitoring...${RESET}"
+echo -e "\n${YELLOW}[*] Task 2: Enabling Managed Prometheus & Deploying Monitoring...${RESET}"
 gcloud container clusters update $CLUSTER_NAME --enable-managed-prometheus --zone $ZONE --quiet
   
 kubectl create ns $NAMESPACE
   
-# Prometheus App
 gsutil cp gs://spls/gsp510/prometheus-app.yaml .
 cat > prometheus-app.yaml <<EOF
 apiVersion: apps/v1
@@ -123,7 +100,6 @@ spec:
 EOF
 kubectl -n $NAMESPACE apply -f prometheus-app.yaml
   
-# Pod Monitoring
 gsutil cp gs://spls/gsp510/pod-monitoring.yaml .
 cat > pod-monitoring.yaml <<EOF
 apiVersion: monitoring.googleapis.com/v1alpha1
@@ -143,7 +119,7 @@ EOF
 kubectl -n $NAMESPACE apply -f pod-monitoring.yaml
 
 # ==============================================================================
-# TASK 3: DEPLOY BUGGY APP (FOR METRIC LOG GENERATION)
+# TASK 3: DEPLOY THE BUGGY APPLICATION
 # ==============================================================================
 echo -e "\n${YELLOW}[*] Task 3: Deploying Initial Application (Generating Error State)...${RESET}"
 cd ~
@@ -151,11 +127,11 @@ gsutil cp -r gs://spls/gsp510/hello-app/ .
 cd ~/hello-app
 kubectl -n $NAMESPACE apply -f manifests/helloweb-deployment.yaml
 
-echo "${CYAN}[*] Pausing 15 seconds to allow error logs to propagate into Cloud Logging...${RESET}"
+echo "${CYAN}[*] Pausing for 15 seconds to allow error logs to register in Cloud Logging...${RESET}"
 sleep 15
 
 # ==============================================================================
-# TASK 4: LOGS-BASED METRIC & ALERTING POLICY
+# TASK 4: LOGS-BASED METRICS & ALERTING
 # ==============================================================================
 echo -e "\n${YELLOW}[*] Task 4: Creating Logs-Based Metric and Alerting Policy...${RESET}"
 gcloud logging metrics create pod-image-errors \
@@ -202,7 +178,7 @@ gcloud alpha monitoring policies create --policy-from-file="awesome.json" --quie
 # ==============================================================================
 # TASK 5: FIX & RE-DEPLOY APP
 # ==============================================================================
-echo -e "\n${YELLOW}[*] Task 5: Fixing Image Reference & Re-deploying App...${RESET}"
+echo -e "\n${YELLOW}[*] Task 5: Updating and Re-deploying Application...${RESET}"
 cd ~/hello-app/manifests
 cat > helloweb-deployment.yaml <<EOF
 apiVersion: apps/v1
@@ -235,10 +211,24 @@ EOF
 kubectl delete deployments helloweb -n $NAMESPACE --quiet
 kubectl -n $NAMESPACE apply -f helloweb-deployment.yaml
 
+echo -e "\n${CYAN}[*] Waiting for deployment to successfully spin up...${RESET}"
+sleep 15
+kubectl get pods -n $NAMESPACE
+
+echo -e "\n${BG_RED}${WHITE}${BOLD}******************************************************************${RESET}"
+echo "${BG_RED}${WHITE}${BOLD}                     CRITICAL STOP                                ${RESET}"
+echo "${BG_RED}${WHITE}${BOLD}******************************************************************${RESET}"
+echo "${YELLOW}${BOLD}The script has paused to protect your score for Task 5.${RESET}"
+echo "1. Go to your lab instructions page."
+echo "2. Click ${BOLD}'Check my progress'${RESET} for Tasks 1, 2, 3, 4, AND 5."
+echo "3. Verify Task 5 gives you the 10/10 points (version 1.0 is running)."
+echo ""
+read -p "${GREEN}${BOLD}Press [ENTER] ONLY AFTER you have confirmed Task 5 is completed to finish the lab...${RESET}"
+
 # ==============================================================================
 # TASK 6: CONTAINERIZE, PUSH & EXPOSE
 # ==============================================================================
-echo -e "\n${YELLOW}[*] Task 6: Updating Code, Building v2 Docker Image & Exposing...${RESET}"
+echo -e "\n${YELLOW}[*] Task 6: Containerizing Code, Pushing to Artifact Registry, and Exposing...${RESET}"
 cd ~/hello-app
 
 cat > main.go <<EOF
@@ -280,7 +270,11 @@ docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
 kubectl set image deployment/helloweb -n $NAMESPACE hello-app=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
 kubectl expose deployment helloweb -n $NAMESPACE --name=$SERVICE_NAME --type=LoadBalancer --port 8080 --target-port 8080
 
+echo -e "\n${CYAN}[*] Waiting for External IP to provision...${RESET}"
+sleep 15
+kubectl get svc -n $NAMESPACE
+
 echo -e "\n${GREEN}${BOLD}====================================================================${RESET}"
-echo "${GREEN}${BOLD}>>> AUTOMATION COMPLETE! ALL TASKS ARE PROVISIONED! <<<${RESET}"
+echo "${GREEN}${BOLD}>>> PIPELINE AUTOMATION COMPLETE! ALL TASKS ARE PROVISIONED! <<<${RESET}"
 echo "${GREEN}${BOLD}====================================================================${RESET}"
-echo "${WHITE}${BOLD}You can now click 'Check my progress' on all tasks in the lab manual!${RESET}"
+echo "${WHITE}${BOLD}Click 'Check my progress' on Task 6 in your lab manual for your 100/100!${RESET}"
