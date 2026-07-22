@@ -2,7 +2,7 @@
 clear
 
 # ==============================================================================
-# ORBIT OF OPS COMMAND CENTER: GENAI129 FLAWLESS MASTER SCRIPT
+# ORBIT OF OPS COMMAND CENTER: GENAI129 FLAWLESS MASTER SCRIPT (UNFROZEN)
 # ==============================================================================
 GREEN=$(tput setaf 2)
 YELLOW=$(tput setaf 3)
@@ -28,7 +28,6 @@ echo ""
 # ==============================================================================
 # PHASE 1: VARIABLE AUTO-FETCH & API PRE-WARMING
 # ==============================================================================
-echo "${YELLOW}[*] Phase 1: Auto-fetching variables and pre-warming APIs...${RESET}"
 export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
 export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
 export REGION=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[google-compute-default-region])" 2>/dev/null)
@@ -39,47 +38,25 @@ export PATH=$PATH:"/home/${USER}/.local/bin"
 gcloud services enable discoveryengine.googleapis.com aiplatform.googleapis.com --quiet
 
 # ==============================================================================
-# PHASE 2: INTERACTIVE UI INSTRUCTIONS FOR TASK 1
+# PHASE 2: SEARCH ENGINE ID
 # ==============================================================================
-echo ""
+echo "${YELLOW}${BOLD}[*] If you already created the Data Store, just paste the ID here!${RESET}"
 echo "${CYAN}${BOLD}======================================================================${RESET}"
-echo "${YELLOW}${BOLD}[*] TASK 1 REQUIRES MANUAL UI CONFIGURATION${RESET}"
-echo "${WHITE}Please follow these steps carefully. Click the URL below to begin:${RESET}"
-echo ""
-echo -e "${CYAN}${BOLD}🔗 URL: https://console.cloud.google.com/agent-platform/search?project=$PROJECT_ID ${RESET}"
-echo ""
-echo "  1. Click ${BOLD}Create${RESET} under 'Custom search (general)'."
-echo "  2. App name: ${BOLD}Paint Search${RESET} | Company: ${BOLD}Cymbal Shops${RESET} | Location: ${BOLD}global${RESET}. Click Continue."
-echo "  3. Click ${BOLD}Create New Data Store${RESET} -> Select ${BOLD}Cloud Storage${RESET}."
-echo "  4. ${BOLD}[Data Step]${RESET}: Under 'Unstructured Data', select ${BOLD}Documents${RESET}."
-echo "     Select ${BOLD}File${RESET} and paste this exact path:"
-echo -e "     ${GREEN}gs://${PROJECT_ID}-bucket/Cymbal_Shops_Paint_Datasheets.pdf${RESET}"
-echo "     Click Continue."
-echo "  5. ${BOLD}[Configuration Step]${RESET}: Name the Data store ${BOLD}Cymbal Paint${RESET}."
-echo "     - Expand ${BOLD}Document processing options${RESET}."
-echo "     - Change Default document parser to ${BOLD}Layout Parser${RESET}."
-echo "     - Check ${BOLD}Enable table annotation${RESET}."
-echo "     - Expand ${BOLD}Document chunking${RESET} and check ${BOLD}Include ancestor headings in chunks${RESET}."
-echo "     Click Continue."
-echo "  6. ${BOLD}[Pricing Step]${RESET}: Select ${BOLD}General pricing${RESET} and click Create."
-echo "  7. ${BOLD}CRITICAL:${RESET} Select the radio button next to your new Data Store, then click Create to finish."
-echo "  8. Click your new 'Paint Search' app, go to the ${BOLD}Integration${RESET} (or API) tab, and copy the ${BOLD}Data Store ID / Search Engine ID${RESET}."
-echo "  9. Click 'Check my progress' for Task 1 in the lab manual!"
-echo "${CYAN}${BOLD}======================================================================${RESET}"
-echo ""
 read -p "PASTE YOUR SEARCH ENGINE ID HERE TO CONTINUE AUTOMATION: " SEARCH_ENGINE_ID
 echo ""
-echo "${YELLOW}${BOLD}[*] Target Locked. Executing Flawless Automation...${RESET}"
+echo "${YELLOW}${BOLD}[*] Target Locked. Executing Automation...${RESET}"
 
 # ==============================================================================
-# PHASE 3: INSTALLATION & ENVIRONMENT
+# PHASE 3: INSTALLATION & ENVIRONMENT (FIXED: NO CACHE, VISIBLE OUTPUT)
 # ==============================================================================
 echo "${YELLOW}[*] Phase 3: Downloading project and installing dependencies...${RESET}"
 cd ~
 rm -rf adk_challenge_lab
 gcloud storage cp -r gs://${PROJECT_ID}-bucket/adk_challenge_lab . --quiet
 
-python3 -m pip install -r adk_challenge_lab/requirements.txt chainlit==2.11.1 --quiet
+echo "${CYAN}[*] Installing Python packages (You will see lots of text, this is normal and prevents hanging!)...${RESET}"
+python3 -m pip install --no-cache-dir -r adk_challenge_lab/requirements.txt
+python3 -m pip install --no-cache-dir chainlit==2.11.1
 
 gcloud iam service-accounts keys create ~/adc.json --iam-account=$SA_EMAIL --quiet
 export GOOGLE_APPLICATION_CREDENTIALS=~/adc.json
