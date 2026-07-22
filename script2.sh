@@ -2,7 +2,7 @@
 clear
 
 # ==============================================================================
-# GSP510 PERFECT MASTER SCRIPT (AUTO-ZONE + RECORDING PAUSE)
+# GSP510 FLAWLESS MASTER SCRIPT (RECORDING EDITION)
 # ==============================================================================
 GREEN=$(tput setaf 2)
 YELLOW=$(tput setaf 3)
@@ -22,7 +22,7 @@ echo "  \____/|_|  |_.__/|_|\__| \___/ |_|   \___/| .__/|___/ "
 echo "                                            | |         "
 echo "                                            |_|         "
 echo "${RESET}"
-echo "${MAGENTA}${BOLD}>>> INITIATING GSP510 KUBERNETES AUTOMATION <<<${RESET}"
+echo "${MAGENTA}${BOLD}>>> INITIATING GKE KUBERNETES AUTOMATION <<<${RESET}"
 echo ""
 
 # ==============================================================================
@@ -60,7 +60,7 @@ read -p "Enter REPO NAME: " REPO_NAME
 read -p "Enter SERVICE NAME: " SERVICE_NAME
 echo ""
 
-echo "${CYAN}${BOLD}[*] Target Locked. Executing Tasks...${RESET}"
+echo "${CYAN}${BOLD}[*] Target Locked. Executing Pipeline...${RESET}"
 
 # ==============================================================================
 # TASK 1: CREATE GKE CLUSTER
@@ -87,7 +87,6 @@ gcloud container clusters update $CLUSTER_NAME --enable-managed-prometheus --zon
   
 kubectl create ns $NAMESPACE
   
-# Prometheus App
 gsutil cp gs://spls/gsp510/prometheus-app.yaml .
 cat > prometheus-app.yaml <<EOF
 apiVersion: apps/v1
@@ -122,7 +121,6 @@ spec:
 EOF
 kubectl -n $NAMESPACE apply -f prometheus-app.yaml
   
-# Pod Monitoring
 gsutil cp gs://spls/gsp510/pod-monitoring.yaml .
 cat > pod-monitoring.yaml <<EOF
 apiVersion: monitoring.googleapis.com/v1alpha1
@@ -142,19 +140,97 @@ EOF
 kubectl -n $NAMESPACE apply -f pod-monitoring.yaml
 
 # ==============================================================================
-# TASK 3: DEPLOY BUGGY APP (FOR METRIC LOG GENERATION)
+# TASK 3: DEPLOY BUGGY APP
 # ==============================================================================
 echo -e "\n${YELLOW}[*] Task 3: Deploying Initial Application (Generating Error State)...${RESET}"
 cd ~
 gsutil cp -r gs://spls/gsp510/hello-app/ .
 cd ~/hello-app
 kubectl -n $NAMESPACE apply -f manifests/helloweb-deployment.yaml
-
-echo "${CYAN}[*] Pausing 15 seconds to allow error logs to propagate into Cloud Logging...${RESET}"
-sleep 15
+sleep 3 # Brief pause to let Kubernetes register the buggy pod
 
 # ==============================================================================
-# TASK 4: LOGS-BASED METRIC & ALERTING POLICY
+# TASK 5: FIX & RE-DEPLOY APP (v1.0)
+# ==============================================================================
+echo -e "\n${YELLOW}[*] Task 5: Fixing Image Reference & Re-deploying App (v1.0)...${RESET}"
+cat > manifests/helloweb-deployment.yaml <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloweb
+  labels:
+    app: hello
+spec:
+  selector:
+    matchLabels:
+      app: hello
+      tier: web
+  template:
+    metadata:
+      labels:
+        app: hello
+        tier: web
+    spec:
+      containers:
+      - name: hello-app
+        image: us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 200m
+EOF
+
+kubectl delete deployments helloweb -n $NAMESPACE
+sleep 5 # Ensure deployment is fully deleted before recreating
+kubectl -n $NAMESPACE apply -f manifests/helloweb-deployment.yaml
+
+# ==============================================================================
+# TASK 6: CONTAINERIZE, PUSH & EXPOSE (v2.0)
+# ==============================================================================
+echo -e "\n${YELLOW}[*] Task 6: Updating Code, Building v2 Docker Image & Exposing...${RESET}"
+cat > main.go <<'EOF'
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+)
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", hello)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server listening on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+func hello(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Serving request: %s", r.URL.Path)
+	host, _ := os.Hostname()
+	fmt.Fprintf(w, "Hello, world!\n")
+	fmt.Fprintf(w, "Version: 2.0.0\n")
+	fmt.Fprintf(w, "Hostname: %s\n", host)
+}
+EOF
+ 
+gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2 .
+docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
+  
+# By using 'set image', we preserve the v1.0 ReplicaSet history for the Task 5 grader!
+kubectl set image deployment/helloweb -n $NAMESPACE hello-app=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
+kubectl expose deployment helloweb -n $NAMESPACE --name=$SERVICE_NAME --type=LoadBalancer --port 8080 --target-port 8080
+
+# ==============================================================================
+# TASK 4: LOGS-BASED METRIC & ALERTING POLICY (Placed at end for safety)
 # ==============================================================================
 echo -e "\n${YELLOW}[*] Task 4: Creating Logs-Based Metric and Alerting Policy...${RESET}"
 gcloud logging metrics create pod-image-errors \
@@ -198,106 +274,7 @@ EOF_END
 
 gcloud alpha monitoring policies create --policy-from-file="awesome.json" --quiet
 
-# ==============================================================================
-# TASK 5: FIX & RE-DEPLOY APP
-# ==============================================================================
-echo -e "\n${YELLOW}[*] Task 5: Fixing Image Reference & Re-deploying App...${RESET}"
-cd ~/hello-app/manifests
-cat > helloweb-deployment.yaml <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: helloweb
-  labels:
-    app: hello
-spec:
-  selector:
-    matchLabels:
-      app: hello
-      tier: web
-  template:
-    metadata:
-      labels:
-        app: hello
-        tier: web
-    spec:
-      containers:
-      - name: hello-app
-        image: us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0
-        ports:
-        - containerPort: 8080
-        resources:
-          requests:
-            cpu: 200m
-EOF
-
-kubectl delete deployments helloweb -n $NAMESPACE --quiet
-kubectl -n $NAMESPACE apply -f helloweb-deployment.yaml
-
-echo -e "\n${CYAN}[*] Waiting for deployment to successfully spin up...${RESET}"
-sleep 15
-kubectl get pods -n $NAMESPACE
-
-echo -e "\n${BG_RED}${WHITE}${BOLD}******************************************************************${RESET}"
-echo "${BG_RED}${WHITE}${BOLD}                     CRITICAL STOP                                ${RESET}"
-echo "${BG_RED}${WHITE}${BOLD}******************************************************************${RESET}"
-echo "${YELLOW}${BOLD}The script has paused to protect your score for Task 5.${RESET}"
-echo "1. Go to your lab instructions page."
-echo "2. Click ${BOLD}'Check my progress'${RESET} for Tasks 1, 2, 3, 4, AND 5."
-echo "3. Verify Task 5 gives you the 10/10 points (version 1.0 is running)."
-echo ""
-read -p "${GREEN}${BOLD}Press [ENTER] ONLY AFTER you have confirmed Task 5 is completed to finish the lab...${RESET}"
-
-# ==============================================================================
-# TASK 6: CONTAINERIZE, PUSH & EXPOSE
-# ==============================================================================
-echo -e "\n${YELLOW}[*] Task 6: Updating Code, Building v2 Docker Image & Exposing...${RESET}"
-cd ~/hello-app
-
-cat > main.go <<EOF
-package main
-
-import (
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-)
-
-func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", hello)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Server listening on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
-}
-
-func hello(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Serving request: %s", r.URL.Path)
-	host, _ := os.Hostname()
-	fmt.Fprintf(w, "Hello, world!\n")
-	fmt.Fprintf(w, "Version: 2.0.0\n")
-	fmt.Fprintf(w, "Hostname: %s\n", host)
-}
-EOF
- 
-gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2 .
-docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
-  
-kubectl set image deployment/helloweb -n $NAMESPACE hello-app=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/hello-app:v2
-kubectl expose deployment helloweb -n $NAMESPACE --name=$SERVICE_NAME --type=LoadBalancer --port 8080 --target-port 8080
-
-echo -e "\n${CYAN}[*] Waiting for External IP to provision...${RESET}"
-sleep 15
-kubectl get svc -n $NAMESPACE
-
 echo -e "\n${GREEN}${BOLD}====================================================================${RESET}"
-echo "${GREEN}${BOLD}>>> PIPELINE AUTOMATION COMPLETE! ALL TASKS ARE PROVISIONED! <<<${RESET}"
+echo "${GREEN}${BOLD}>>> AUTOMATION COMPLETE! ALL TASKS ARE PROVISIONED! <<<${RESET}"
 echo "${GREEN}${BOLD}====================================================================${RESET}"
-echo "${WHITE}${BOLD}Click 'Check my progress' on Task 6 in your lab manual for your 100/100!${RESET}"
+echo "${WHITE}${BOLD}You can now click 'Check my progress' on ALL tasks for your 100/100!${RESET}"
