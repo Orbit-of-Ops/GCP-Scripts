@@ -74,8 +74,8 @@ bq query --use_legacy_sql=false "SELECT * FROM (SELECT subregion1_name as state,
 echo "${GREEN}[*] Task 4: Fatality ratio...${RESET}"
 bq query --use_legacy_sql=false "SELECT sum(cumulative_confirmed) as total_confirmed_cases, sum(cumulative_deceased) as total_deaths, (sum(cumulative_deceased)/sum(cumulative_confirmed))*100 as case_fatality_ratio FROM \`bigquery-public-data.covid19_open_data.covid19_open_data\` WHERE country_name='Italy' AND date BETWEEN '${T4_START}' AND '${T4_END}'"
 
-echo "${GREEN}[*] Task 5: Identify a specific day...${RESET}"
-bq query --use_legacy_sql=false "SELECT date FROM \`bigquery-public-data.covid19_open_data.covid19_open_data\` WHERE country_name='Italy' AND cumulative_deceased > ${T5_DEATHS} ORDER BY date ASC LIMIT 1"
+echo "${GREEN}[*] Task 5: Identify a specific day (Aggregated)...${RESET}"
+bq query --use_legacy_sql=false "SELECT date FROM (SELECT date, SUM(cumulative_deceased) AS total_deaths FROM \`bigquery-public-data.covid19_open_data.covid19_open_data\` WHERE country_name = 'Italy' GROUP BY date) WHERE total_deaths > ${T5_DEATHS} ORDER BY date ASC LIMIT 1"
 
 echo "${GREEN}[*] Task 6: Find days with zero net new cases...${RESET}"
 bq query --use_legacy_sql=false "WITH india_cases_by_date AS (SELECT date, SUM(cumulative_confirmed) AS cases FROM \`bigquery-public-data.covid19_open_data.covid19_open_data\` WHERE country_name ='India' AND date BETWEEN '${T6_START}' AND '${T6_END}' GROUP BY date ORDER BY date ASC), india_previous_day_comparison AS (SELECT date, cases, LAG(cases) OVER(ORDER BY date) AS previous_day, cases - LAG(cases) OVER(ORDER BY date) AS net_new_cases FROM india_cases_by_date) SELECT count(*) FROM india_previous_day_comparison WHERE net_new_cases = 0"
