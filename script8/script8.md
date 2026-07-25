@@ -5,7 +5,7 @@
 ```
 rm gemini-explorer-challenge.ipynb
 
-curl -LO raw.githubusercontent.com/Orbit-of-Ops/Google-Cloud-Labs-Solutions/refs/heads/main/Discover%20and%20Protect%20Sensitive%20Data%20Across%20Your%20Ecosystem%20Challenge%20Lab/deidentify-model-response-challenge-lab.ipynb
+curl -LO https://raw.githubusercontent.com/Orbit-of-Ops/GCP-Scripts/refs/heads/main/script8/gemini-explorer-challenge.ipynb
 
 curl -L -o logo.png "https://orbitofops.com/logo.png"
 ```
