@@ -24,11 +24,11 @@ echo -e "${RESET}"
 
 echo -e "${BLUE}${BOLD}╔════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BLUE}${BOLD}║                                                            ║${RESET}"
-echo -e "${BLUE}${BOLD}║   🌊 WELCOME TO DR ABHISHEK CLOUD TUTORIALS                ║${RESET}"
+echo -e "${BLUE}${BOLD}║   🌊 WELCOME TO Orbit Of Ops                               ║${RESET}"
 echo -e "${BLUE}${BOLD}║   🚀 TARGET: ARC115 MONITORING CHALLENGE LAB               ║${RESET}"
 echo -e "${BLUE}${BOLD}║                                                            ║${RESET}"
 echo -e "${BLUE}${BOLD}║   📺 Subscribe & Learn more at:                            ║${RESET}"
-echo -e "${BLUE}${BOLD}║   ${BLINK}https://youtube.com/@drabhishek.5460${RESET}${BLUE}${BOLD}                     ║${RESET}"
+echo -e "${BLUE}${BOLD}║   ${BLINK}https://youtube.com/@orbitofops${RESET}${BLUE}${BOLD}                     ║${RESET}"
 echo -e "${BLUE}${BOLD}║                                                            ║${RESET}"
 echo -e "${BLUE}${BOLD}╚════════════════════════════════════════════════════════════╝${RESET}\n"
 
