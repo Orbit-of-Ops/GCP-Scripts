@@ -41,7 +41,7 @@ echo -e "${BLUE}${BOLD}[Orbit of Ops] Step 1: Enabling Required APIs...${RESET}"
 gcloud services enable datacatalog.googleapis.com dataplex.googleapis.com storage.googleapis.com --quiet
 
 echo -e "${CYAN}${BOLD}[Orbit of Ops] Step 2: Creating Cloud Storage Bucket...${RESET}"
-gsutil mb -l $REGION gs://$PROJECT_ID 2>/dev/null || true
+gsutil mb -l $REGION gs://$PROJECT_ID-bucket 2>/dev/null || true
 
 # ==============================================================================
 # Cleanup & Completion
