@@ -77,12 +77,17 @@ gcloud run deploy pubsub-events \
   --allow-unauthenticated
 
 echo -e "\n${YELLOW}${BOLD}Task 3: Creating and testing Pub/Sub event trigger using Eventarc...${RESET}"
-gcloud eventarc triggers create pubsub-events-trigger \
+
+# Robust retry loop to handle Eventarc service agent propagation delay
+while ! gcloud eventarc triggers create pubsub-events-trigger \
   --location=${LOCATION} \
   --destination-run-service=pubsub-events \
   --destination-run-region=${LOCATION} \
   --transport-topic=${PROJECT_ID}-topic \
-  --event-filters="type=google.cloud.pubsub.topic.v1.messagePublished"
+  --event-filters="type=google.cloud.pubsub.topic.v1.messagePublished"; do
+    echo -e "${CYAN}Waiting for Eventarc service agent to be ready. Retrying in 15 seconds...${RESET}"
+    sleep 15
+done
 
 echo -e "\n${YELLOW}${BOLD}Publishing test message to verify the trigger...${RESET}"
 gcloud pubsub topics publish ${PROJECT_ID}-topic \
