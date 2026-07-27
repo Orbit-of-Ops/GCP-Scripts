@@ -1,8 +1,8 @@
 
-curl -LO https://raw.githubusercontent.com/Orbit-of-Ops/GCP-Scripts/refs/heads/main/script2.sh
+curl -LO https://github.com/Orbit-of-Ops/GCP-Scripts/raw/refs/heads/main/script22.sh
 
 
-sudo chmod +x *.sh
+sudo chmod +x script22.sh
 
-./*.sh
+./script22.sh
 
