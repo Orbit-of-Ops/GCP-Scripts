@@ -20,27 +20,19 @@ echo -e "${BLUE}${BOLD}║   🚀 BROUGHT TO YOU BY ORBIT OF OPS                
 echo -e "${BLUE}${BOLD}╚════════════════════════════════════════════════════════════╝${RESET}\n"
 
 export PROJECT_ID=$(gcloud config get-value project)
-export REGION=$(gcloud config get-value compute/region 2>/dev/null)
-if [ -z "$REGION" ] || [ "$REGION" == "(unset)" ]; then
-    export ZONE=$(gcloud config get-value compute/zone 2>/dev/null)
-    export REGION=${ZONE%-*}
+
+echo "Detecting region from existing VPN tunnels..."
+export REGION=$(gcloud compute vpn-tunnels list --format="value(region)" --limit=1)
+
+if [[ -z "$REGION" ]]; then
+  echo "Unable to detect region from VPN tunnels."
+  exit 1
 fi
-if [ -z "$REGION" ] || [ "$REGION" == "(unset)" ]; then
-    read -p "Please paste the REGION from your lab instructions (e.g. us-central1) and press Enter: " REGION </dev/tty
-fi
+
+echo "Region detected: $REGION"
 gcloud config set compute/region $REGION
 
 HUB_NAME=ncc-hub
-
-echo "Detecting region from existing VPN tunnels..."
-VPN_REGION=$(gcloud compute vpn-tunnels list --format="value(region)" --limit=1)
-
-if [[ -z "$VPN_REGION" ]]; then
-  echo "Unable to detect region from VPN tunnels. Falling back to default region."
-else
-  export REGION=$VPN_REGION
-  echo "Region updated from VPN tunnels: $REGION"
-fi
 
 # Create NCC Hub (location global)
 if gcloud network-connectivity hubs describe $HUB_NAME --project=$PROJECT_ID >/dev/null 2>&1; then
