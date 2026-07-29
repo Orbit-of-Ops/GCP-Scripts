@@ -30,7 +30,6 @@ export PROJECT_ID=$(gcloud config get-value project)
 export REGION=us-central1
 export ZONE=us-central1-a
 
-# 1. Setup Environment
 echo -e "${YELLOW}${BOLD}Enabling APIs & Downloading Repository...${RESET}"
 gcloud services enable apigateway.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com firestore.googleapis.com
 cd ~
@@ -157,7 +156,6 @@ describe('GET /outofstock', () => {
     expect(response.body[1].quantity).toBe(0);
   });
 });
-// Subscribe to Tech & Code https://www.youtube.com/@orbitofops
 EOF
 
 # 3. Write Backend File
@@ -173,7 +171,6 @@ cat << 'EOF' > ~/cymbal-superstore/backend/index.ts
 // #
 // # Unless required by applicable law or agreed to in writing, software
 // # distributed under the License is distributed on an "AS IS" BASIS,
-// # ... (omitted standard Apache header lines) ...
 // # limitations under the License.
 // Init Express.js
 import express, { Express, Request, Response } from "express";
@@ -296,11 +293,30 @@ if (process.env.NODE_ENV !== "test") {
 // the new products page always has items to show.
 function initFirestoreCollection() {
   const oldProducts = [
-    "Apples", "Bananas", "Milk", "Whole Wheat Bread", "Eggs", "Cheddar Cheese",
-    "Whole Chicken", "Rice", "Black Beans", "Bottled Water", "Apple Juice",
-    "Cola", "Coffee Beans", "Green Tea", "Watermelon", "Broccoli",
-    "Jasmine Rice", "Yogurt", "Beef", "Shrimp", "Walnuts", "Sunflower Seeds",
-    "Fresh Basil", "Cinnamon",
+    "Apples",
+    "Bananas",
+    "Milk",
+    "Whole Wheat Bread",
+    "Eggs",
+    "Cheddar Cheese",
+    "Whole Chicken",
+    "Rice",
+    "Black Beans",
+    "Bottled Water",
+    "Apple Juice",
+    "Cola",
+    "Coffee Beans",
+    "Green Tea",
+    "Watermelon",
+    "Broccoli",
+    "Jasmine Rice",
+    "Yogurt",
+    "Beef",
+    "Shrimp",
+    "Walnuts",
+    "Sunflower Seeds",
+    "Fresh Basil",
+    "Cinnamon",
   ];
   // iterate over product names
   // add "old" products to firestore - all added between 1 month and 12 months ago
@@ -328,8 +344,14 @@ function initFirestoreCollection() {
   }
   // Add recent products (force add last 7 days)
   const recentProducts = [
-    "Parmesan Crisps", "Pineapple Kombucha", "Maple Almond Butter", "Mint Chocolate Cookies",
-    "White Chocolate Caramel Corn", "Acai Smoothie Packs", "Smores Cereal", "Peanut Butter and Jelly Cups",
+    "Parmesan Crisps",
+    "Pineapple Kombucha",
+    "Maple Almond Butter",
+    "Mint Chocolate Cookies",
+    "White Chocolate Caramel Corn",
+    "Acai Smoothie Packs",
+    "Smores Cereal",
+    "Peanut Butter and Jelly Cups",
   ];
   for (let j = 0; j < recentProducts.length; j++) {
     const recent = {
@@ -390,7 +412,6 @@ function addOrUpdateFirestore(product) {
       }
     });
 }
-// Subscribe to Tech & Code https://www.youtube.com/@orbitofops
 EOF
 
 # 4. Run tests
@@ -462,11 +483,30 @@ functions.http('outofstock', async (req, res) => {
 // This will overwrite products in the database - this is intentional, to keep the date-added fresh.
 function initFirestoreCollection() {
   const oldProducts = [
-    "Apples", "Bananas", "Milk", "Whole Wheat Bread", "Eggs", "Cheddar Cheese",
-    "Whole Chicken", "Rice", "Black Beans", "Bottled Water", "Apple Juice",
-    "Cola", "Coffee Beans", "Green Tea", "Watermelon", "Broccoli",
-    "Jasmine Rice", "Yogurt", "Beef", "Shrimp", "Walnuts", "Sunflower Seeds",
-    "Fresh Basil", "Cinnamon",
+    "Apples",
+    "Bananas",
+    "Milk",
+    "Whole Wheat Bread",
+    "Eggs",
+    "Cheddar Cheese",
+    "Whole Chicken",
+    "Rice",
+    "Black Beans",
+    "Bottled Water",
+    "Apple Juice",
+    "Cola",
+    "Coffee Beans",
+    "Green Tea",
+    "Watermelon",
+    "Broccoli",
+    "Jasmine Rice",
+    "Yogurt",
+    "Beef",
+    "Shrimp",
+    "Walnuts",
+    "Sunflower Seeds",
+    "Fresh Basil",
+    "Cinnamon",
   ];
   // Add "old" products to Firestore
   for (let i = 0; i < oldProducts.length; i++) {
@@ -483,8 +523,14 @@ function initFirestoreCollection() {
   }
   // Add recent products
   const recentProducts = [
-    "Parmesan Crisps", "Pineapple Kombucha", "Maple Almond Butter", "Mint Chocolate Cookies",
-    "White Chocolate Caramel Corn", "Acai Smoothie Packs", "Smores Cereal", "Peanut Butter and Jelly Cups",
+    "Parmesan Crisps",
+    "Pineapple Kombucha",
+    "Maple Almond Butter",
+    "Mint Chocolate Cookies",
+    "White Chocolate Caramel Corn",
+    "Acai Smoothie Packs",
+    "Smores Cereal",
+    "Peanut Butter and Jelly Cups",
   ];
   for (let j = 0; j < recentProducts.length; j++) {
     const recent = {
@@ -530,7 +576,7 @@ function addOrUpdateFirestore(product) {
       }
     });
 }
-// Subscribe to Tech & Code https://www.youtube.com/@orbitofops
+//Subscribe to CLOUD HUSTLERS https://www.youtube.com/@orbitofops/videos
 EOF
 
 # 6. Deploy function
@@ -566,7 +612,6 @@ paths:
             items:
               type: object
 security: []
-# Brought to you by Orbit of Ops
 EOF
 
 # 8. Deploy Gateway
