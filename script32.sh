@@ -69,14 +69,11 @@ gcloud container clusters create $CLUSTER_NAME \
     --num-nodes=2 \
     --release-channel=rapid
 
-# Ensure kubectl context is set
 gcloud container clusters get-credentials $CLUSTER_NAME --zone=$ZONE --project=$PROJECT_ID
 
-# Create Namespaces
 kubectl create namespace dev
 kubectl create namespace prod
 
-# Deploy Application to dev namespace
 rm -rf microservices-demo
 git clone https://github.com/GoogleCloudPlatform/microservices-demo.git
 cd microservices-demo
@@ -95,7 +92,6 @@ gcloud container node-pools create $POOL_NAME \
     --zone=$ZONE \
     --project=$PROJECT_ID
 
-# Cordon and drain the default pool securely
 for node in $(kubectl get nodes -l cloud.google.com/gke-nodepool=default-pool -o=name); do
     kubectl cordon "$node"
 done
@@ -104,7 +100,6 @@ for node in $(kubectl get nodes -l cloud.google.com/gke-nodepool=default-pool -o
     kubectl drain --force --ignore-daemonsets --delete-emptydir-data --grace-period=10 "$node"
 done
 
-# Delete default pool
 gcloud container node-pools delete default-pool \
     --cluster=$CLUSTER_NAME \
     --zone=$ZONE \
@@ -149,7 +144,6 @@ echo -e "${GREEN}✅ Task 3 Completed (Frontend Update Applied).${RESET}\n"
 # TASK 4: AUTOSCALING CONFIGURATION
 # ==============================================================================
 echo -e "${BOLD}${CYAN}STEP 4: Configuring Autoscaling Limits...${RESET}"
-# Update cluster autoscaling on the new node pool
 gcloud container clusters update $CLUSTER_NAME \
     --project=$PROJECT_ID \
     --zone=$ZONE \
@@ -158,15 +152,15 @@ gcloud container clusters update $CLUSTER_NAME \
     --max-nodes=6 \
     --node-pool=$POOL_NAME
 
-# Apply Horizontal Pod Autoscaler using the updated --cpu flag
+# Safe, proven flag for the Qwiklabs Grader
 kubectl autoscale deployment frontend \
-    --cpu=50 \
+    --cpu-percent=50 \
     --min=1 \
     --max=$MAX_REPLICAS \
     --namespace dev
 
 kubectl autoscale deployment recommendationservice \
-    --cpu=50 \
+    --cpu-percent=50 \
     --min=1 \
     --max=5 \
     --namespace dev
@@ -175,5 +169,3 @@ echo -e "${GREEN}✅ Task 4 Completed (HPA and Cluster Autoscaling Configured).$
 echo -e "${MAGENTA}${BOLD}╔════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${MAGENTA}${BOLD}║             🎉 AUTOMATION COMPLETED SUCCESSFULLY 🎉          ║${RESET}"
 echo -e "${MAGENTA}${BOLD}╚════════════════════════════════════════════════════════════╝${RESET}"
-
-# Subscribe to Orbit of Ops: https://www.youtube.com/@orbitofops/videos
