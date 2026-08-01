@@ -1,3 +1,5 @@
+#!/bin/bash
+set +H
 clear
 
 # ==============================================================================
@@ -25,7 +27,7 @@ cat << "EOF"
                                             |_|        
 EOF
 echo -e "${RESET}"
-echo -e "${MAGENTA}${BOLD} 🚀 Starting Orbit of Ops Execution (GSP313)... ${RESET}"
+echo -e "${MAGENTA}${BOLD} 🚀 Starting Orbit of Ops Master Execution (GSP313)... ${RESET}"
 echo -e "${BLUE}--------------------------------------------------------------------------------${RESET}\n"
 
 # ==============================================================================
@@ -70,11 +72,11 @@ for i in 1 2 3; do
     --tags=network-lb-tag \
     --image-family=debian-12 \
     --image-project=debian-cloud \
-    --metadata=startup-script="#!/bin/bash
+    --metadata=startup-script='#!/bin/bash
       apt-get update
       apt-get install apache2 -y
       service apache2 restart
-      echo \"<h3>Web Server: web$i</h3>\" | tee /var/www/html/index.html" --quiet &
+      echo "<h3>Web Server: web'$i'</h3>" | tee /var/www/html/index.html' --quiet &
 done
 wait
 echo -e "${GREEN}✅ Web instances created.${RESET}"
