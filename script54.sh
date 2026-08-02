@@ -1,3 +1,4 @@
+#!/bin/bash
 clear
 
 # ==============================================================================
@@ -63,8 +64,11 @@ read BUCKET_2
 echo -ne "${BOLD}${CYAN}Enter Bucket 3 Name: ${RESET}"
 read BUCKET_3
 
-echo -ne "\n${BOLD}${MAGENTA}Enter your assigned Form ID (1, 2, or 3): ${RESET}"
-read FORM_ID
+echo -ne "\n${BOLD}${MAGENTA}Enter your assigned Form ID (e.g., 1, 2, 3, or form-3): ${RESET}"
+read RAW_FORM_ID
+
+# Intelligently strip out any non-numeric characters (e.g., converts "form-3" to "3")
+FORM_ID="${RAW_FORM_ID//[!0-9]/}"
 
 echo -e "\n${BLUE}--------------------------------------------------------------------------------${RESET}\n"
 
@@ -121,7 +125,7 @@ elif [ "$FORM_ID" == "3" ]; then
     gsutil defstorageclass set ARCHIVE gs://$BUCKET_3
 
 else
-    echo -e "${BOLD}${RED}❌ Invalid Form ID entered. Please run the script again and enter 1, 2, or 3.${RESET}"
+    echo -e "${BOLD}${RED}❌ Invalid Form ID entered (Detected: '$FORM_ID'). Please run the script again and enter 1, 2, or 3.${RESET}"
     exit 1
 fi
 
