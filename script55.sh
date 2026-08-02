@@ -1,22 +1,18 @@
+#!/bin/bash
 clear
-
-# ==============================================================================
-# Color Variables & Orbit of Ops Branding
-# ==============================================================================
-RED='\e[1;31m'
-GREEN='\e[1;32m'
-YELLOW='\e[1;33m'
-BLUE='\e[1;34m'
-MAGENTA='\e[1;35m'
 CYAN='\e[1;36m'
-WHITE='\e[1;37m'
-BOLD='\e[1m'
+BLUE='\e[1;34m'
+YELLOW='\e[1;33m'
+GREEN='\e[1;32m'
+RED='\e[1;31m'
+MAGENTA='\e[1;35m'
 RESET='\e[0m'
+BOLD='\e[1m'
 
 echo -e "${CYAN}${BOLD}"
 cat << "EOF"
-  ____       _     _ _            __    ___            
- / __ \     | |   (_) |          / _|  / _ \           
+  ____        _     _ _             __    ___            
+ / __ \      | |   (_) |           / _|  / _ \           
 | |  | |_ __| |__  _| |_   ___  | |_  | | | |_ __  ___ 
 | |  | | '__| '_ \| | __| / _ \ |  _| | | | | '_ \/ __|
 | |__| | |  | |_) | | |_ | (_) || |   | |_| | |_) \__ \
@@ -25,106 +21,108 @@ cat << "EOF"
                                             |_|        
 EOF
 echo -e "${RESET}"
-echo -e "${MAGENTA}${BOLD} 🚀 Starting Orbit of Ops Master Execution (ARC106)... ${RESET}"
-echo -e "${BLUE}--------------------------------------------------------------------------------${RESET}\n"
+echo -e "${BLUE}${BOLD}╔════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BLUE}${BOLD}║   🚀 BROUGHT TO YOU BY ORBIT OF OPS — MASTER SCRIPT        ║${RESET}"
+echo -e "${BLUE}${BOLD}╚════════════════════════════════════════════════════════════╝${RESET}\n"
 
+# PRE-FLIGHT CHECKS & AUTO-FETCH
 # ==============================================================================
-# USER INPUT (DYNAMIC LAB VARIABLES)
-# ==============================================================================
-echo -e "${BOLD}${YELLOW}⚠️ ATTENTION: Check your lab instructions for the following names: ${RESET}"
-
-echo -ne "${BOLD}${CYAN}Enter BigQuery Dataset Name (Task 2): ${RESET}"
-read DATASET_NAME
-
-echo -ne "${BOLD}${CYAN}Enter BigQuery Table Name (Task 2): ${RESET}"
-read TABLE_NAME
-
-echo -ne "${BOLD}${CYAN}Enter Pub/Sub Topic Name (Task 3): ${RESET}"
-read TOPIC_NAME
-
-echo -ne "${BOLD}${CYAN}Enter Dataflow Job Name (Task 4): ${RESET}"
-read JOB_NAME
-
-echo -e "\n${BLUE}--------------------------------------------------------------------------------${RESET}\n"
-
-# ==============================================================================
-# PRE-FLIGHT CHECKS
-# ==============================================================================
-echo -e "${BOLD}${YELLOW}[Orbit of Ops] Auto-fetching Project and Region...${RESET}"
-
+echo -e "${YELLOW}${BOLD}[Orbit of Ops] Auto-fetching Project and Region...${RESET}"
 export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
-export REGION=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[google-compute-default-region])" 2>/dev/null)
+if [[ -z "$PROJECT_ID" ]]; then
+    export PROJECT_ID=$DEVSHELL_PROJECT_ID
+fi
 
-if [[ -z "$REGION" ]]; then
-    echo -e "${BOLD}${RED}⚠️ Could not auto-detect the default region.${RESET}"
-    echo -ne "${BOLD}${CYAN}Please enter the lab Region (e.g., us-central1): ${RESET}"
-    read REGION
+ZONE=$(gcloud compute project-info describe \
+    --format="value(commonInstanceMetadata.items[google-compute-default-zone])" 2>/dev/null | tail -n 1)
+
+if [[ -n "$ZONE" ]]; then
+    export REGION=${ZONE%-*}
+else
+    echo -e "${RED}${BOLD}⚠️ Could not auto-detect region.${RESET}"
+    read -p "Enter the lab REGION (e.g., us-west4): " REGION
+    export REGION
 fi
 
 gcloud config set compute/region $REGION 2>/dev/null
 
 echo -e "✅ Project ID: ${GREEN}$PROJECT_ID${RESET}"
 echo -e "✅ Region:     ${GREEN}$REGION${RESET}\n"
-echo -e "${BLUE}--------------------------------------------------------------------------------${RESET}\n"
 
+# LAB VARIABLES PROMPT
 # ==============================================================================
-# MAIN SCRIPT EXECUTION
+echo -e "${YELLOW}${BOLD}Please enter the variables shown on your lab panel:${RESET}"
+read -p "BigQuery DATASET name: " DATASET
+read -p "BigQuery TABLE name: " TABLE
+read -p "Pub/Sub TOPIC name: " TOPIC
+read -p "Dataflow JOB name: " JOB
+
+# TASK 0: ENABLE APIS
 # ==============================================================================
+echo -e "\n${CYAN}0️⃣ Enabling Dataflow & Compute APIs...${RESET}"
+gcloud services enable dataflow.googleapis.com compute.googleapis.com
+echo -e "${YELLOW}Waiting 20 seconds for API propagation...${RESET}"
+sleep 20
 
-echo -e "${BOLD}${CYAN}[Orbit of Ops] Enabling required APIs...${RESET}"
-gcloud services enable \
-  bigquery.googleapis.com \
-  pubsub.googleapis.com \
-  dataflow.googleapis.com \
-  storage-api.googleapis.com \
-  --quiet
+# TASK 1: CREATE STORAGE BUCKET
+# ==============================================================================
+echo -e "\n${CYAN}1️⃣ Task 1 — Creating Cloud Storage Bucket...${RESET}"
+gcloud storage buckets create gs://$PROJECT_ID --location=$REGION
 
-echo -e "\n${BOLD}${CYAN}[Orbit of Ops] Task 1: Creating Cloud Storage bucket ($PROJECT_ID)...${RESET}"
-gsutil mb -l US gs://$PROJECT_ID 2>/dev/null || true
+# TASK 2: CREATE BIGQUERY DATASET & TABLE
+# ==============================================================================
+echo -e "\n${CYAN}2️⃣ Task 2 — Creating BigQuery Dataset & Table...${RESET}"
+bq mk --dataset --location=US $PROJECT_ID:$DATASET
+bq mk --table $PROJECT_ID:$DATASET.$TABLE data:STRING
 
-echo -e "\n${BOLD}${CYAN}[Orbit of Ops] Task 2: Creating BigQuery Dataset ($DATASET_NAME) in US...${RESET}"
-bq --location=US mk --dataset $PROJECT_ID:$DATASET_NAME 2>/dev/null || true
+# TASK 3: CREATE PUB/SUB TOPIC & SUBSCRIPTION
+# ==============================================================================
+echo -e "\n${CYAN}3️⃣ Task 3 — Creating Pub/Sub Topic & Default Subscription...${RESET}"
+gcloud pubsub topics create $TOPIC
+gcloud pubsub subscriptions create ${TOPIC}-sub --topic=$TOPIC
 
-echo -e "\n${BOLD}${CYAN}[Orbit of Ops] Task 2: Creating BigQuery Table ($TABLE_NAME)...${RESET}"
-bq mk --table $PROJECT_ID:$DATASET_NAME.$TABLE_NAME data:STRING 2>/dev/null || true
-
-echo -e "\n${BOLD}${CYAN}[Orbit of Ops] Task 3: Creating Pub/Sub Topic ($TOPIC_NAME) with default subscription...${RESET}"
-gcloud pubsub topics create $TOPIC_NAME --quiet 2>/dev/null || true
-gcloud pubsub subscriptions create ${TOPIC_NAME}-sub --topic=$TOPIC_NAME --quiet 2>/dev/null || true
-
-echo -e "\n${BOLD}${CYAN}[Orbit of Ops] Task 4: Launching Dataflow Pipeline Job ($JOB_NAME)...${RESET}"
-gcloud dataflow jobs run $JOB_NAME \
+# TASK 4: LAUNCH DATAFLOW STREAMING JOB
+# ==============================================================================
+echo -e "\n${CYAN}4️⃣ Task 4 — Launching Dataflow Pipeline...${RESET}"
+gcloud dataflow jobs run $JOB \
   --gcs-location gs://dataflow-templates-$REGION/latest/PubSub_to_BigQuery \
   --region $REGION \
   --project $PROJECT_ID \
   --staging-location gs://$PROJECT_ID/temp \
-  --parameters inputTopic=projects/$PROJECT_ID/topics/$TOPIC_NAME,outputTableSpec=$PROJECT_ID:$DATASET_NAME.$TABLE_NAME
+  --num-workers 1 \
+  --max-workers 2 \
+  --parameters inputTopic=projects/$PROJECT_ID/topics/$TOPIC,outputTableSpec=$PROJECT_ID:$DATASET.$TABLE
 
-echo -e "\n${BOLD}${YELLOW}[Orbit of Ops] Task 5: Waiting for Dataflow job to enter 'Running' state to publish test message...${RESET}"
+# TASK 5: MONITOR JOB & PUBLISH TEST MESSAGE
+# ==============================================================================
+echo -e "\n${CYAN}5️⃣ Task 5 — Monitoring Job State & Validating Data...${RESET}"
 while true; do
-    STATUS=$(gcloud dataflow jobs list --region=$REGION --project=$PROJECT_ID --filter="name:$JOB_NAME AND state:Running" --format="value(state)" 2>/dev/null)
+    STATUS=$(gcloud dataflow jobs list --region=$REGION --format="value(name,state)" 2>/dev/null | grep -E "^$JOB" | awk '{print $2}')
     
-    if [ "$STATUS" == "Running" ]; then
-        echo -e "${GREEN}✅ Dataflow job is running successfully! Publishing test message...${RESET}"
-        sleep 10
+    if [[ "$STATUS" == "Running" ]]; then
+        echo -e "${GREEN}${BOLD}✅ Dataflow Job is RUNNING!${RESET}"
         
-        # Publish message (Task 5)
-        gcloud pubsub topics publish $TOPIC_NAME --message='{"data": "73.4 F"}'
+        echo -e "${YELLOW}Waiting 20 seconds for pipeline stabilization...${RESET}"
+        sleep 20
         
-        echo -e "${CYAN}Validating records in BigQuery...${RESET}"
-        bq query --nouse_legacy_sql "SELECT * FROM \`$PROJECT_ID.$DATASET_NAME.$TABLE_NAME\`"
+        echo -e "${CYAN}Publishing test message to topic...${RESET}"
+        gcloud pubsub topics publish $TOPIC --message='{"data": "73.4 F"}'
+        
+        echo -e "${YELLOW}Waiting 15 seconds before querying BigQuery...${RESET}"
+        sleep 15
+        
+        echo -e "${CYAN}Querying BigQuery table...${RESET}"
+        bq query --nouse_legacy_sql "SELECT * FROM \`$PROJECT_ID.$DATASET.$TABLE\`"
+        break
+    elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" ]]; then
+        echo -e "${RED}${BOLD}❌ Dataflow job FAILED. Please check Qwiklabs quotas or region logs.${RESET}"
         break
     else
-        echo -e "${YELLOW}⏳ Dataflow job is initializing, waiting 30 seconds...${RESET}"
+        echo -e "${YELLOW}Dataflow job provisioning (Status: ${STATUS:-Pending}). Checking in 30 seconds...${RESET}"
         sleep 30
     fi
 done
 
-# ==============================================================================
-# COMPLETION
-# ==============================================================================
 echo -e "\n${MAGENTA}${BOLD}╔════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${MAGENTA}${BOLD}║            🎉 AUTOMATION COMPLETED SUCCESSFULLY 🎉           ║${RESET}"
 echo -e "${MAGENTA}${BOLD}╚════════════════════════════════════════════════════════════╝${RESET}"
-echo -e "${GREEN}${BOLD}You can now safely click ALL 'Check my progress' buttons in your lab manual.${RESET}"
-echo -e "${CYAN}${BOLD}Subscribe to Orbit of Ops: https://www.youtube.com/@orbitofops/videos${RESET}\n"
