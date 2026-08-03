@@ -28,7 +28,7 @@ export PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
 export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)' 2>/dev/null)
 
 echo -e "${YELLOW}${BOLD}Please enter the variables exactly as they appear in your lab panel:${RESET}"
-read -p "Region (e.g., europe-west4): " REGION
+read -p "Region (e.g., us-east1): " REGION
 export REGION
 read -p "Bucket Name: " BUCKET_NAME
 export BUCKET_NAME
@@ -38,59 +38,35 @@ read -p "Pub/Sub Topic Name: " TOPIC_NAME
 export TOPIC_NAME
 read -p "Cloud Run Function Name: " FUNCTION_NAME
 export FUNCTION_NAME
-read -p "Alert Notification Email (Dummy email is fine): " ALERT_EMAIL
+read -p "Alert Notification Email: " ALERT_EMAIL
 export ALERT_EMAIL
 
 echo -e "\n${CYAN}0️⃣ Enabling APIs & Force-Patching IAM Roles...${RESET}"
-gcloud services enable \
-  artifactregistry.googleapis.com \
-  cloudfunctions.googleapis.com \
-  cloudbuild.googleapis.com \
-  eventarc.googleapis.com \
-  run.googleapis.com \
-  pubsub.googleapis.com \
-  storage.googleapis.com \
-  monitoring.googleapis.com
+gcloud services enable artifactregistry.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com eventarc.googleapis.com run.googleapis.com pubsub.googleapis.com storage.googleapis.com monitoring.googleapis.com
 
 GCS_SA="service-${PROJECT_NUMBER}@gs-project-accounts.iam.gserviceaccount.com"
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:${GCS_SA}" \
-  --role="roles/pubsub.publisher" \
-  --quiet >/dev/null 2>&1
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --quiet >/dev/null 2>&1
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${GCS_SA}" --role="roles/pubsub.publisher" --quiet >/dev/null 2>&1
 
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/eventarc.eventReceiver" \
-  --quiet >/dev/null 2>&1
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:${COMPUTE_SA}" \
-  --role="roles/artifactregistry.reader" \
-  --quiet >/dev/null 2>&1
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${COMPUTE_SA}" --role="roles/eventarc.eventReceiver" --quiet >/dev/null 2>&1
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${COMPUTE_SA}" --role="roles/artifactregistry.reader" --quiet >/dev/null 2>&1
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com" \
-  --role="roles/eventarc.serviceAgent" \
-  --quiet >/dev/null 2>&1
+PUBSUB_SA="service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${PUBSUB_SA}" --role="roles/iam.serviceAccountTokenCreator" --quiet >/dev/null 2>&1
+
+EVENTARC_SA="service-${PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${EVENTARC_SA}" --role="roles/eventarc.serviceAgent" --quiet >/dev/null 2>&1
 
 echo -e "\n${CYAN}1️⃣ Task 1 — Creating Storage Bucket and Granting User 2 Access...${RESET}"
-gcloud storage buckets create gs://$BUCKET_NAME --location=$REGION
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="user:$USER_2" \
-  --role="roles/storage.objectViewer" \
-  --quiet
+gcloud storage buckets create gs://$BUCKET_NAME --location=$REGION 2>/dev/null
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="user:$USER_2" --role="roles/storage.objectViewer" --quiet
 
 echo -e "\n${CYAN}2️⃣ Task 2 — Creating the Pub/Sub Topic...${RESET}"
-gcloud pubsub topics create $TOPIC_NAME
+gcloud pubsub topics create $TOPIC_NAME 2>/dev/null
 
 echo -e "\n${CYAN}3️⃣ Task 3 — Creating & Deploying the Thumbnail Cloud Run Function...${RESET}"
-mkdir -p thumbnail_app
-cd thumbnail_app
+mkdir -p ~/thumbnail_app
+cd ~/thumbnail_app
 
 cat > index.js <<EOF
 /* globals exports, require */
@@ -148,12 +124,6 @@ exports.thumbnail = (event, context) => {
           });
       });
     }
-    else {
-      console.log(\`gs://\${bucketName}/\${fileName} is not an image I can handle\`);
-    }
-  }
-  else {
-    console.log(\`gs://\${bucketName}/\${fileName} already has a thumbnail\`);
   }
 };
 EOF
@@ -179,47 +149,34 @@ cat > package.json <<EOF
 }
 EOF
 
-echo -e "${YELLOW}Deploying Cloud Run Function (Using smart-retry logic)...${RESET}"
-MAX_RETRIES=3
-ATTEMPT=1
-SUCCESS=false
+echo -e "\n${YELLOW}Waiting 60 seconds to guarantee all IAM policies have propagated...${RESET}"
+sleep 60
 
-while [ $ATTEMPT -le $MAX_RETRIES ]; do
-    echo -e "${CYAN}Deployment Attempt $ATTEMPT of $MAX_RETRIES...${RESET}"
+echo -e "${YELLOW}Deploying Cloud Run Function (Restricted to 1 instance)...${RESET}"
+
+for i in 1 2 3; do
+    echo -e "${CYAN}Deployment Attempt $i of 3...${RESET}"
     if gcloud functions deploy $FUNCTION_NAME \
         --gen2 \
         --runtime=nodejs22 \
         --region=$REGION \
         --source=. \
         --entry-point=thumbnail \
-        --trigger-event-filters="type=google.cloud.storage.object.v1.finalized" \
-        --trigger-event-filters="bucket=$BUCKET_NAME" \
+        --trigger-bucket=$BUCKET_NAME \
+        --max-instances=1 \
         --quiet; then
-        
-        SUCCESS=true
         echo -e "${GREEN}✅ Function deployed successfully!${RESET}"
         break
     else
-        echo -e "${RED}⚠️ Deployment failed due to IAM propagation delay.${RESET}"
-        if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-            echo -e "${YELLOW}Waiting 45 seconds for Qwiklabs backend to catch up before retrying...${RESET}"
-            sleep 45
-        fi
-        ATTEMPT=$((ATTEMPT + 1))
+        echo -e "${RED}⚠️ Deployment failed (IAM delay). Waiting 45 seconds before next try...${RESET}"
+        sleep 45
     fi
 done
 
-if [ "$SUCCESS" = false ]; then
-    echo -e "${RED}❌ Failed to deploy after $MAX_RETRIES attempts. Please check terminal logs.${RESET}"
-    exit 1
-fi
-
 echo -e "\n${CYAN}4️⃣ Task 4 — Testing Infrastructure & Creating Alert Policy...${RESET}"
-echo -e "${YELLOW}Downloading sample image and uploading to Bucket...${RESET}"
 wget -q https://storage.googleapis.com/cloud-training/arc101/travel.jpg
-gcloud storage cp travel.jpg gs://$BUCKET_NAME/
+gcloud storage cp travel.jpg gs://$BUCKET_NAME/ 2>/dev/null
 
-echo -e "${YELLOW}Creating Notification Channel for: $ALERT_EMAIL...${RESET}"
 CHANNEL_ID=$(gcloud beta monitoring channels create \
     --display-name="Personal Email" \
     --type=email \
